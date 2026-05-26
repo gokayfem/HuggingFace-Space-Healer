@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fix Hugging Face Spaces"
+  short_description: "Repair broken Hugging Face Spaces"
+  default_prompt: "Use $fix-huggingface-spaces to diagnose, patch, and verify a broken Hugging Face Space safely."
