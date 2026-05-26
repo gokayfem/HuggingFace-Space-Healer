@@ -20,6 +20,8 @@ Treat a Space repair as a production debugging job:
 
 Prefer official Hugging Face docs when a config field, runtime behavior, or API shape may have changed. The Spaces config reference defines README frontmatter such as `sdk`, `sdk_version`, `python_version`, and `app_file`, and `python_version` is a string field. Quote values like `"3.10"` so YAML does not parse them as numbers.
 
+Command examples in this skill use Linux shell syntax (`bash`, `curl`, `export`, POSIX paths). Adapt only if the user explicitly asks for another shell.
+
 ## Safety Boundaries
 
 ### Tokens
@@ -30,17 +32,17 @@ Treat Hugging Face tokens as secrets.
 - Do not put tokens in `git remote` URLs.
 - Prefer short-lived in-memory auth:
 
-```powershell
-$token = $env:HF_TOKEN
-$basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("__token__:$token"))
+```bash
+basic="$(printf '__token__:%s' "$HF_TOKEN" | base64 | tr -d '\n')"
 git -c http.extraheader="Authorization: Basic $basic" push origin main
 ```
 
 - For REST calls, use an in-memory header:
 
-```powershell
-$headers = @{ Authorization = "Bearer $env:HF_TOKEN" }
-Invoke-RestMethod -Uri "https://huggingface.co/api/spaces/user/space/runtime" -Headers $headers
+```bash
+curl -fsS \
+  -H "Authorization: Bearer $HF_TOKEN" \
+  "https://huggingface.co/api/spaces/user/space/runtime"
 ```
 
 - If a token was pasted into chat, finish the task and then recommend rotation.
@@ -90,41 +92,42 @@ The UI title is often not the repo slug. Resolve exact IDs first.
 
 Public list:
 
-```powershell
-Invoke-RestMethod -Uri "https://huggingface.co/api/spaces?author=USER&full=false"
+```bash
+curl -fsS "https://huggingface.co/api/spaces?author=USER&full=false"
 ```
 
 Authenticated list, only when private scope is authorized:
 
-```powershell
-$headers = @{ Authorization = "Bearer $env:HF_TOKEN" }
-Invoke-RestMethod -Uri "https://huggingface.co/api/spaces?author=USER&full=false" -Headers $headers
+```bash
+curl -fsS \
+  -H "Authorization: Bearer $HF_TOKEN" \
+  "https://huggingface.co/api/spaces?author=USER&full=false"
 ```
 
 Use runtime endpoint per Space:
 
-```powershell
-Invoke-RestMethod -Uri "https://huggingface.co/api/spaces/USER/SPACE/runtime"
+```bash
+curl -fsS "https://huggingface.co/api/spaces/USER/SPACE/runtime"
 ```
 
 The bundled helper can scan public or explicit Spaces from the skill directory:
 
-```powershell
+```bash
 python scripts/space_status.py --author USER
 python scripts/space_status.py --ids USER/SPACE USER/OTHER
 ```
 
 Use private listing only when private inspection is explicitly authorized:
 
-```powershell
-$env:HF_TOKEN = "hf_..."
+```bash
+export HF_TOKEN="<hugging-face-token>"
 python scripts/space_status.py --author USER --include-private --token-env HF_TOKEN
 ```
 
 For an explicitly named private Space, pass the id and a token:
 
-```powershell
-$env:HF_TOKEN = "hf_..."
+```bash
+export HF_TOKEN="<hugging-face-token>"
 python scripts/space_status.py --ids USER/PRIVATE-SPACE --token-env HF_TOKEN
 ```
 
@@ -132,29 +135,29 @@ python scripts/space_status.py --ids USER/PRIVATE-SPACE --token-env HF_TOKEN
 
 Public:
 
-```powershell
-$env:GIT_LFS_SKIP_SMUDGE = "1"
-git clone --depth 1 https://huggingface.co/spaces/USER/SPACE C:\work\spaces\SPACE
+```bash
+export GIT_LFS_SKIP_SMUDGE=1
+git clone --depth 1 https://huggingface.co/spaces/USER/SPACE ./spaces/SPACE
 ```
 
 Private, with explicit authorization:
 
-```powershell
-$env:GIT_LFS_SKIP_SMUDGE = "1"
-$token = $env:HF_TOKEN
-$basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("__token__:$token"))
-git -c http.extraheader="Authorization: Basic $basic" clone --depth 1 https://huggingface.co/spaces/USER/SPACE C:\work\spaces\SPACE
+```bash
+export GIT_LFS_SKIP_SMUDGE=1
+basic="$(printf '__token__:%s' "$HF_TOKEN" | base64 | tr -d '\n')"
+git -c http.extraheader="Authorization: Basic $basic" \
+  clone --depth 1 https://huggingface.co/spaces/USER/SPACE ./spaces/SPACE
 ```
 
 After cloning:
 
-```powershell
+```bash
 git remote -v
 git status --short
 rg --files
-Get-Content -Raw README.md
-Get-Content -Raw requirements.txt
-Get-Content -Raw app.py
+cat README.md
+cat requirements.txt
+sed -n '1,220p' app.py
 ```
 
 ### 3. Read README Frontmatter First
@@ -194,13 +197,19 @@ Use the runtime stage plus logs:
 
 Public page check:
 
-```powershell
-$r = Invoke-WebRequest -Uri "https://USER-SPACE.hf.space/" -UseBasicParsing -TimeoutSec 60
-[PSCustomObject]@{
-  StatusCode = $r.StatusCode
-  Length = $r.Content.Length
-  Title = ([regex]::Match($r.Content, "<title>(.*?)</title>").Groups[1].Value)
-}
+```bash
+curl -fsS -L \
+  -o /tmp/space.html \
+  -w 'HTTP %{http_code}\nbytes %{size_download}\n' \
+  "https://USER-SPACE.hf.space/"
+python - <<'PY'
+from pathlib import Path
+import re
+
+html = Path("/tmp/space.html").read_text(errors="ignore")
+match = re.search(r"<title>(.*?)</title>", html, re.I | re.S)
+print("title", match.group(1).strip() if match else "")
+PY
 ```
 
 ## High-Value Failure Patterns
@@ -488,13 +497,13 @@ Prefer narrow pins over broad latest upgrades. When fixing requirements:
 - Avoid `torch`, `torchvision`, `diffusers`, `transformers`, `gradio`, and `huggingface_hub` all floating together.
 - Use dry-run resolver checks when feasible:
 
-```powershell
+```bash
 python -m pip install --dry-run -r requirements.txt
 ```
 
 For Linux/Python wheel checks:
 
-```powershell
+```bash
 python -m pip install --dry-run --only-binary=:all: --platform manylinux_2_28_x86_64 --python-version 3.10 --implementation cp --abi cp310 -r requirements.txt
 ```
 
@@ -506,14 +515,14 @@ Always verify in layers:
 
 1. Local syntax:
 
-```powershell
+```bash
 python -m py_compile app.py
 python -m compileall -q app.py package_dir
 ```
 
 2. Git cleanliness:
 
-```powershell
+```bash
 git status --short
 ```
 
@@ -521,14 +530,14 @@ git status --short
 
 4. Poll runtime:
 
-```powershell
-Invoke-RestMethod -Uri "https://huggingface.co/api/spaces/USER/SPACE/runtime"
+```bash
+curl -fsS "https://huggingface.co/api/spaces/USER/SPACE/runtime"
 ```
 
 5. Fetch the public Space page when applicable:
 
-```powershell
-Invoke-WebRequest -Uri "https://USER-SPACE.hf.space/" -UseBasicParsing -TimeoutSec 60
+```bash
+curl -fsS -L -o /dev/null -w 'HTTP %{http_code}\n' "https://USER-SPACE.hf.space/"
 ```
 
 6. If user reported an action failure, test the same action path when practical. A `RUNNING` stage only proves the app server started.
@@ -539,16 +548,15 @@ Poll patiently. Heavy ML Spaces can spend minutes in `BUILDING` or `APP_STARTING
 
 Use scoped commits:
 
-```powershell
+```bash
 git add README.md requirements.txt app.py
 git commit -m "Fix Space runtime dependencies"
 ```
 
 Push without storing the token:
 
-```powershell
-$token = $env:HF_TOKEN
-$basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("__token__:$token"))
+```bash
+basic="$(printf '__token__:%s' "$HF_TOKEN" | base64 | tr -d '\n')"
 git -c http.extraheader="Authorization: Basic $basic" push origin main
 ```
 

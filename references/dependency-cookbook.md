@@ -283,14 +283,14 @@ Prefer comments only when they explain a non-obvious pin. Do not annotate every 
 
 Useful local checks:
 
-```powershell
+```bash
 python -m pip install --dry-run -r requirements.txt
 python -m pip check
 ```
 
 Linux/Python wheel availability:
 
-```powershell
+```bash
 python -m pip install --dry-run --only-binary=:all: --platform manylinux_2_28_x86_64 --python-version 3.10 --implementation cp --abi cp310 -r requirements.txt
 ```
 

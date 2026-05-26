@@ -122,7 +122,7 @@ High-value pins seen repeatedly:
 
 When resolving:
 
-```powershell
+```bash
 python -m pip install --dry-run -r requirements.txt
 python -m pip check
 ```

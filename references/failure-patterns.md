@@ -6,12 +6,10 @@ This reference expands the main workflow with concrete examples. Load it when a 
 
 The runtime endpoint sometimes truncates errors. Build logs may be available through a Server-Sent Events endpoint:
 
-```powershell
-$headers = @{ Authorization = "Bearer $env:HF_TOKEN" }
-Invoke-WebRequest `
-  -Uri "https://huggingface.co/api/spaces/USER/SPACE/logs/build?tail=200" `
-  -Headers $headers `
-  -UseBasicParsing
+```bash
+curl -fsS -N \
+  -H "Authorization: Bearer $HF_TOKEN" \
+  "https://huggingface.co/api/spaces/USER/SPACE/logs/build?tail=200"
 ```
 
 Do not use authenticated log endpoints for private Spaces unless explicitly authorized. When private repair is authorized, use an in-memory token header and avoid saving logs that may contain private repo names, file names, or stack traces unless the user requested an artifact.
@@ -185,8 +183,8 @@ Options:
 
 Before pushing:
 
-```powershell
-Get-ChildItem -Directory -Recurse -Filter __pycache__
+```bash
+find . -type d -name __pycache__ -print
 git status --short
 ```
 

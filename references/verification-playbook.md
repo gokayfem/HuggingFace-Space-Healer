@@ -31,20 +31,21 @@ Do not stop at step 3 when the user reported a page-level or button-level failur
 
 Public:
 
-```powershell
-Invoke-RestMethod -Uri "https://huggingface.co/api/spaces/USER/SPACE/runtime"
+```bash
+curl -fsS "https://huggingface.co/api/spaces/USER/SPACE/runtime"
 ```
 
 Private, only with explicit authorization:
 
-```powershell
-$headers = @{ Authorization = "Bearer $env:HF_TOKEN" }
-Invoke-RestMethod -Uri "https://huggingface.co/api/spaces/USER/SPACE/runtime" -Headers $headers
+```bash
+curl -fsS \
+  -H "Authorization: Bearer $HF_TOKEN" \
+  "https://huggingface.co/api/spaces/USER/SPACE/runtime"
 ```
 
 With the bundled script:
 
-```powershell
+```bash
 python scripts/space_status.py --ids USER/SPACE
 python scripts/space_status.py --ids USER/PRIVATE-SPACE --token-env HF_TOKEN
 ```
@@ -69,13 +70,19 @@ https://OWNER-SPACE.hf.space/
 
 Use a page fetch:
 
-```powershell
-$r = Invoke-WebRequest -Uri "https://OWNER-SPACE.hf.space/" -UseBasicParsing -TimeoutSec 60
-[PSCustomObject]@{
-  StatusCode = $r.StatusCode
-  Length = $r.Content.Length
-  Title = ([regex]::Match($r.Content, "<title>(.*?)</title>").Groups[1].Value)
-}
+```bash
+curl -fsS -L \
+  -o /tmp/space.html \
+  -w 'HTTP %{http_code}\nbytes %{size_download}\n' \
+  "https://OWNER-SPACE.hf.space/"
+python - <<'PY'
+from pathlib import Path
+import re
+
+html = Path("/tmp/space.html").read_text(errors="ignore")
+match = re.search(r"<title>(.*?)</title>", html, re.I | re.S)
+print("title", match.group(1).strip() if match else "")
+PY
 ```
 
 If the page returns 200 but looks like a platform loading screen only, wait and retry. Heavy Spaces can briefly report running before the frontend is fully useful.
@@ -129,12 +136,10 @@ Use logs safely:
 
 Build-log pattern:
 
-```powershell
-$headers = @{ Authorization = "Bearer $env:HF_TOKEN" }
-Invoke-WebRequest `
-  -Uri "https://huggingface.co/api/spaces/USER/SPACE/logs/build?tail=200" `
-  -Headers $headers `
-  -UseBasicParsing
+```bash
+curl -fsS -N \
+  -H "Authorization: Bearer $HF_TOKEN" \
+  "https://huggingface.co/api/spaces/USER/SPACE/logs/build?tail=200"
 ```
 
 If unauthenticated public log access fails, use the Space UI or the runtime error payload. Do not add a token for public work unless needed.
