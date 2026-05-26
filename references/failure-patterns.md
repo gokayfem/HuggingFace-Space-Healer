@@ -16,6 +16,27 @@ Invoke-WebRequest `
 
 Do not use authenticated log endpoints for private Spaces unless explicitly authorized. When private repair is authorized, use an in-memory token header and avoid saving logs that may contain private repo names, file names, or stack traces unless the user requested an artifact.
 
+## RUNNING but Internal Server Error
+
+If the runtime endpoint says `RUNNING` but the public page returns internal server error, the base container started but the app is not healthy enough for users.
+
+Common causes:
+
+- Gradio route rendering fails after launch.
+- A component kwarg is unsupported by the pinned Gradio version.
+- `share=True` or unusual `launch()` arguments interfere with Spaces.
+- A lazy-loaded model path crashes on first page/request.
+- A custom component frontend asset is missing.
+- The app assumes CUDA outside a GPU-decorated path.
+
+Actions:
+
+- Fetch the page once, then inspect runtime logs.
+- Search recent edits for Gradio kwargs added before the version pin.
+- Keep `demo.launch()` simple.
+- Verify request callbacks, not only module import.
+- Do not declare success until the page or relevant path passes.
+
 ## README Frontmatter Pitfalls
 
 Use string values for versions:
@@ -44,6 +65,7 @@ Signs that a lower Gradio 4 is required:
 Known adjustments:
 
 - `gr.Video(loop=True)` is not accepted by some Gradio 4 versions. Remove `loop`.
+- `share=True` is usually unnecessary on Spaces. Remove it unless the app has a specific reason.
 - Pin `pydantic==2.10.6`.
 - Pin `huggingface_hub<1.0`.
 
@@ -107,6 +129,19 @@ torchvision==0.26.0
 
 Always verify against current Hugging Face runtime errors because ZeroGPU supported versions change.
 
+## Native Extension and Pre-Requirements
+
+Some Spaces use `pre-requirements.txt` or similar preinstall files so torch is available before packages that compile extensions. Preserve this intent.
+
+Use this pattern when build logs show extension setup importing torch or probing CUDA:
+
+- Put torch and companion wheels in the preinstall file if the Space already uses one.
+- Use `--no-build-isolation` for packages that must see installed torch.
+- Set `TORCH_CUDA_ARCH_LIST` when build logs cannot infer GPU architecture.
+- Match extension wheels such as xformers or spconv to the torch/CUDA family.
+
+Do not move every dependency into pre-requirements. It is for build-order-sensitive packages.
+
 ## Common Missing Packages
 
 Add these only when the traceback proves they are needed:
@@ -128,6 +163,8 @@ Always:
 - Use `check=True`.
 - Avoid `shell=True`.
 - Prefer `--no-build-isolation` when package setup imports torch.
+
+Also remove duplicate runtime installs after moving a dependency into `requirements.txt`. A Space that installs the same package at build time and runtime can fail differently on each restart.
 
 ## Large Models and CPU Spaces
 

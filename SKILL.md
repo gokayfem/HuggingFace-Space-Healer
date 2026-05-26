@@ -575,4 +575,11 @@ Final responses should include:
 
 ## References
 
-Use `references/failure-patterns.md` for more examples and exact symptoms. Use `scripts/space_status.py` for quick public or explicitly authorized authenticated scans.
+Use the references progressively:
+
+- `references/failure-patterns.md`: exact symptoms, log phrases, and targeted fixes.
+- `references/field-notes.md`: battle-tested lessons from repeated repairs, including scope discipline, lazy loading, and "RUNNING but 500" traps.
+- `references/dependency-cookbook.md`: Gradio, ZeroGPU, torch, diffusers, transformers, Florence, Hub, and Real-ESRGAN pinning heuristics.
+- `references/verification-playbook.md`: post-push polling, page checks, request-path checks, and when to wait versus patch again.
+
+Use `scripts/space_status.py` for quick public or explicitly authorized authenticated scans.
